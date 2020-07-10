@@ -3,6 +3,7 @@ const bodyParser = require("body-parser");
 const { graphqlHTTP } = require("express-graphql");
 const { buildSchema } = require("graphql");
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 const port = 3000;
 
 const app = express();
@@ -14,6 +15,8 @@ app.use(express.urlencoded({ extended: true }));
 // app.use(bodyParser.json());
 
 const Event = require("./models/event");
+const User = require("./models/user");
+const { argsToArgsConfig } = require("graphql/type/definition");
 
 app.use(
   "/graphql",
@@ -26,6 +29,17 @@ app.use(
       description: String!
       price: Float!
       date: String!
+    }
+
+    type User {
+     _id: ID!
+     email: String! 
+     password: String 
+    }
+
+    input UserInput {
+      email: String!
+      password: String!
     }
 
     input EventInput{
@@ -41,6 +55,7 @@ app.use(
 
     type RootMutation {
       createEvent(eventInput: EventInput): Event
+      createUser(userInput: UserInput): User
     }
 
     schema{
@@ -83,10 +98,28 @@ app.use(
           .save()
           .then((result) => {
             console.log(result);
-            return { ...result._doc };
+            return { ...result._doc, _id: event._doc._id.toString() };
           })
           .catch((err) => {
             console.log(err);
+          });
+      },
+      createUser: (args) => {
+        return bcrypt
+          .hash(args.userInput.password, 12)
+          .then((hashedPass) => {
+            const user = new User({
+              email: args.userInput.email,
+              password: hashedPass,
+            });
+            return user.save();
+          })
+          .then((result) => {
+            return { ...result._doc, _di: result.id };
+          })
+          .catch((err) => {
+            console.log(err);
+            throw err;
           });
       },
     },
